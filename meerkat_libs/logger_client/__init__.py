@@ -32,15 +32,14 @@ class FlaskActivityLogger:
             path = request.path.split("/")[-1]
             if not path:
                 path = "root"
-            print(g.payload)
-            if path not in excluded:
+            if path not in excluded and self.logging_url:
                 logger.send({"path": request.path,
                              "base_url": request.base_url,
                              "full_url": request.url,
-                             "user": g.payload.get("usr", None),
-                             "role": g.payload.get("acc",
-                                                   {}).get(self.implementation,
-                                                           []),
+                             "user": g.get("payload", {}).get("usr", None),
+                             "role": g.get("paylod", {}).get("acc",
+                                                             {}).get(self.implementation,
+                                                                     []),
                              "request_time": time.time() - g.time})
 
 
