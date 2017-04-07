@@ -11,8 +11,8 @@ class FlaskActivityLogger:
         self.app = app
         self.logging_url = app.config.get("LOGGING_URL", None)
         self.source = app.config.get("LOGGING_SOURCE", None)
-        self.source_type = app.config.get("LOGGING_SOUCRE_TYPE", None)
-        self.implementation = app.config.get("LOGGING_IMPLEMENTAION", None)
+        self.source_type = app.config.get("LOGGING_SOURCE_TYPE", None)
+        self.implementation = app.config.get("LOGGING_IMPLEMENTATION", None)
         self.event_type = "user_event"
         logger = Logger(self.logging_url,
                         self.event_type,
