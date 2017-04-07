@@ -263,3 +263,8 @@ class Authorise:
             return decorated
 
         return decorator
+
+
+# Store an instance of the class in this module.
+# So it can be easily imported into other modules.
+auth = Authorise()
