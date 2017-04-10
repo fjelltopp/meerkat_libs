@@ -126,10 +126,12 @@ class Authorise:
         # Get session
         session_key = '{}-{}'.format(payload['usr'], payload['exp'])
         session_value = self.SESSIONS.get(session_key, False)
+        logging.warning('SESSION VALUE: {}'.format(session_value))
 
         # If session doesn't exist create session.
         if not session_value:
             try:
+                logging.warning('No pre-existing user data. Fetching remotly.')
                 r = requests.post(
                     AUTH_ROOT + '/api/get_user',
                     json={'jwt': token}
@@ -140,7 +142,7 @@ class Authorise:
                     JWT_PUBLIC_KEY,
                     algorithms=[JWT_ALGORITHM]
                 )
-                logging.warning("REMOTE USER: {}".format(user))
+                logging.warning("REMOTE USER TOKEN: {}".format(user))
             except Exception as e:
                 logging.warning(
                     "Failed to get remote user details: " + repr(e)
@@ -158,7 +160,7 @@ class Authorise:
         """
         s = self.SESSIONS.items()
         now = datetime.now().timestamp()
-        self.SESSIONS = {k: v for k, v in s if v.get('exp', 0) <= now}
+        self.SESSIONS = {k: v for k, v in s if v.get('exp', 0) >= now}
 
     def check_auth(self, access, countries):
         """
@@ -267,4 +269,5 @@ class Authorise:
 
 # Store an instance of the class in this module.
 # So it can be easily imported into other modules.
+logging.warning('Creating auth')
 auth = Authorise()
