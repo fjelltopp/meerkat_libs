@@ -24,10 +24,10 @@ class Authorise:
     SESSIONS = {}
 
     @staticmethod
-    def check_access(access, countries, acc):
+    def check_access(access, countries, acc, logic='OR'):
         """
         Compares the access levels specified in the require_jwt decorator with
-        the accesslevels specified in the given jwt. Returns a boolean stating
+        the access levels specified in the given jwt. Returns a boolean stating
         whether there is a match.
 
         Accepts "" as a wildcard country, meaning any country.
@@ -42,6 +42,11 @@ class Authorise:
                 the length match. Accepts wildcard value "" for any country.
                 Default value is [""], meaning all specified access levels will
                 be valid for any country if countires is not specified.
+            acc (dict) The user's access dictionary from the user's payload.
+            inclusive (bool): Default True. Inclusive checking or exclusive
+                checking.  The former grants access if the user carries any of
+                the specified access levels.  The latter denies access if the
+                user doesn't carry any of the specified access levels.
 
         Returns:
             bool True if authorised, False if unauthorised.
@@ -52,28 +57,44 @@ class Authorise:
             for i in range(j, len(access)):
                 countries.append(countries[j-1])
 
+        # Inclusive access checking looks for an access level in common
+        # If there is a shared access level, the authorisation granted.
         authorised = False
-
-        # For each country specified by the decorator...
-        for i in range(0, len(countries)):
-            country = countries[i]
-            # ...if that country is specified in the token...
-            if country in acc:
-                # ...and if corresponding country's role is in token...
-                if access[i] in acc[country] or access[i] == "":
-                    # ...then authorise.
-                    authorised = True
-                    break
-
-            # ...Else if the country specified by the decorator is wildcard...
-            elif country == "":
-                # ...Look through all countries specified in the jwt...
-                for c in acc:
-                    # ...if an access level in jwt matches a level in args...
-                    if access[i] in acc[c] or access[i] == "":
+        if logic == 'OR':
+            # For each country specified by the decorator
+            for i in range(0, len(countries)):
+                country = countries[i]
+                # ...if that country is specified in the token
+                if country in acc:
+                    # ...and if corresponding country's role is in token
+                    if access[i] in acc[country] or access[i] == "":
                         # ...then authorise.
                         authorised = True
                         break
+
+                # ...Else if the country specified by the decorator is wildcard
+                elif country == "":
+                    # ...Look through all countries specified in the jwt
+                    for c in acc:
+                        # ...if an access level in jwt matches a level in args
+                        if access[i] in acc[c] or access[i] == "":
+                            # ...then authorise.
+                            authorised = True
+                            break
+
+        # Exclusive access checking looks for an access level difference.
+        # If there is a difference the access is not granted.
+        elif logic == 'AND':
+            authorised = True
+            # Look at each access level the account has.
+            for i in range(len(access)):
+                acc_role = access[i]
+                acc_country = countries[i]
+                # If there is an access level not in the current users access
+                # (If the current user has access in that country...)
+                if acc_role not in acc.get(acc_country, []):
+                    authorised = False
+                    break
 
         return authorised
 
@@ -162,18 +183,21 @@ class Authorise:
         now = datetime.now().timestamp()
         self.SESSIONS = {k: v for k, v in s if v.get('exp', 0) >= now}
 
-    def check_auth(self, access, countries):
+    def check_auth(self, access, countries, logic='OR'):
         """
         A function that checks whether the user is authorised to continue with
         the current request. It does this by verifying the jwt stored as a
         cookie. If the user isn't authorised the request is aborted with an
         Invalid Token Error.
 
-        If access is granted the user details is stored in flask g, under the
+        If access is granted the user details are stored in flask g, under the
         property "payload", i.e.`g.payload`.
 
-        NOTE: The roles specifed are ORed to figure out access. i.e. ANY of the
-        given access roles will grant access (we don't require ALL of them).
+        NOTE: By default the roles specifed are ORed to figure out access. i.e.
+        ANY of the given access roles will grant access (we don't require ALL
+        of them). Setting logical='AND' will AND the roles to figure out
+        access. i.e. the user must have all the specified access roles in order
+        to proceed.
 
         Args:
             access ([str]) A list of role titles that have access to this
@@ -192,6 +216,10 @@ class Authorise:
                 Gives access to managers and shared accounts from any country.
                 E.g. (['manager','shared'], countries=['jordan'])
                 Gives access to managers and shared accounts only from Jordan.
+            logic (str): Default 'OR', alernative: 'AND'.  The former grants
+                access if the user carries any of the specified access levels.
+                The latter only grants access if the user carries ALL of the
+                specified access levels.
         """
 
         # Only translate error strings if Bable is up and running.
@@ -216,11 +244,11 @@ class Authorise:
 
         try:
             # Get complete user details from the token.
-            payload = self.get_user(token)
+            user = self.get_user(token)
 
             # Check user has required access, if so, store user details in g.
-            if Authorise.check_access(access, countries, payload['acc']):
-                g.payload = payload
+            if Authorise.check_access(access, countries, user['acc'], logic):
+                g.payload = user
 
             # Token is invalid if it doesn't have the required accesss levels.
             else:
