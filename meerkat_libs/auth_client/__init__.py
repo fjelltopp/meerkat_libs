@@ -231,9 +231,8 @@ class Authorise:
             from flask.ext.babel import gettext
             not_authenticated = gettext(not_authenticated)
             incorrect_access = gettext(incorrect_access)
-        except (KeyError, ImportError):
+        except (ImportError, KeyError):
             logging.warning('Flask babel not installed - can\'t translate.')
-            pass
 
         # Get the jwt.
         token = Authorise.get_token()
@@ -258,10 +257,12 @@ class Authorise:
 
         # Return 403 if logged in but the jwt isn't valid.
         except InvalidTokenError as e:
+            logging.warning('Invalid token - Access Denied: ' + str(e))
             abort(403, str(e))
 
         # Otherwise abort with an internal server error page.
         except Exception as e:
+            logging.warning('Error in authentication: ' + str(e))
             abort(500, str(e))
 
     def authorise(self, access, countries):
