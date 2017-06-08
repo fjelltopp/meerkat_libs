@@ -1,13 +1,11 @@
 from flask import abort, request, g
 from functools import wraps
 from jwt import InvalidTokenError
-from flask.ext.babel import gettext
 from datetime import datetime
 import jwt
 import logging
 import os
 import requests
-import json
 
 # Need this module to be importable without the whole of meerkat_auth config.
 # Directly load the secret settings file from which to import configs.
@@ -230,9 +228,11 @@ class Authorise:
                             "for this page: {}.")
 
         try:
+            from flask.ext.babel import gettext
             not_authenticated = gettext(not_authenticated)
             incorrect_access = gettext(incorrect_access)
-        except KeyError:
+        except (KeyError, ImportError):
+            logging.warning('Flask babel not installed - can\'t translate.')
             pass
 
         # Get the jwt.
