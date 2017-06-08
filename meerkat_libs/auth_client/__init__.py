@@ -258,6 +258,7 @@ class Authorise:
         # Return 403 if logged in but the jwt isn't valid.
         except InvalidTokenError as e:
             logging.warning('Invalid token - Access Denied: ' + str(e))
+            logging.warning('Token: ' + str(token))
             abort(403, str(e))
 
         # Otherwise abort with an internal server error page.
