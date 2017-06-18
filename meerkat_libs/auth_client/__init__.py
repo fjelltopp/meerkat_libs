@@ -116,6 +116,10 @@ class Authorise:
         if not token and auth_headers:
             token = auth_headers[len(JWT_HEADER_PREFIX):]
 
+        # Extract the token from the GET args if it is still not found
+        if not token:
+            token = request.args.get(JWT_COOKIE_NAME)
+
         return token if token else ""
 
     def get_user(self, token):
