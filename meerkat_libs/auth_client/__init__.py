@@ -41,10 +41,11 @@ class Authorise:
                 Default value is [""], meaning all specified access levels will
                 be valid for any country if countires is not specified.
             acc (dict) The user's access dictionary from the user's payload.
-            inclusive (bool): Default True. Inclusive checking or exclusive
-                checking.  The former grants access if the user carries any of
-                the specified access levels.  The latter denies access if the
-                user doesn't carry any of the specified access levels.
+            logic (string): Default 'OR'. Specify the logic used for checking
+                access. Can be 'OR' or 'AND'. The former grants access if the
+                user carries any of specified access levels.  The latter denies
+                access if the user doesn't carry any of the specified access
+                levels.
 
         Returns:
             bool True if authorised, False if unauthorised.
