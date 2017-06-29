@@ -113,8 +113,11 @@ class Authorise:
         token = request.cookies.get(JWT_COOKIE_NAME)
 
         # Extract the token from the headers if it doesn't exist in the cookies
-        auth_headers = request.headers.get('authorization')
-        if not token and auth_headers:
+        auth_headers = request.headers.get(
+            'authorization',
+            request.headers.get('Authorization', '')
+        )
+        if not token and JWT_HEADER_PREFIX in auth_headers:
             token = auth_headers[len(JWT_HEADER_PREFIX):]
 
         # Extract the token from the GET args if it is still not found
@@ -150,7 +153,6 @@ class Authorise:
         # Get session
         session_key = '{}-{}'.format(payload['usr'], payload['exp'])
         session_value = self.SESSIONS.get(session_key, False)
-        logging.warning('SESSION VALUE: {}'.format(session_value))
 
         # If session doesn't exist create session.
         if not session_value:
@@ -166,9 +168,8 @@ class Authorise:
                     JWT_PUBLIC_KEY,
                     algorithms=[JWT_ALGORITHM]
                 )
-                logging.warning("REMOTE USER TOKEN: {}".format(user))
             except Exception as e:
-                logging.warning(
+                logging.error(
                     "Failed to get remote user details: " + repr(e)
                 )
                 user = {}
