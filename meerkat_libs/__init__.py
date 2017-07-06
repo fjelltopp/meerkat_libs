@@ -67,6 +67,9 @@ def hermes(url, method, data={}):
     except requests.exceptions.RequestException as e:
         logging.error("Failed to access Hermes.")
         logging.error(e)
+    except requests.exceptions.HTTPError as e:
+        logging.error("Hermes request failed with HTTP Error")
+        logging.error(e)
 
     try:
         return r.json()
