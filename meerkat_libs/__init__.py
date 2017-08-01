@@ -5,7 +5,7 @@ import os
 
 # Configs from environment variables
 HERMES_ROOT = os.environ.get("HERMES_API_ROOT", "")
-AUTH_ROOT = os.environ.get('MEERKAT_AUTH_ROOT', 'http://dev_nginx_1/auth')
+AUTH_ROOT = os.environ.get('MEERKAT_AUTH_ROOT', 'http://nginx/auth')
 SERVER_AUTH_USERNAME = os.environ.get('SERVER_AUTH_USERNAME', 'root')
 SERVER_AUTH_PASSWORD = os.environ.get('SERVER_AUTH_PASSWORD', 'password')
 
