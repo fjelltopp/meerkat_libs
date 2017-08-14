@@ -2,16 +2,18 @@ import logging
 import requests
 import json
 import os
-
+import jwt
+#from meerkat_libs import auth_client
 # Configs from environment variables
 HERMES_ROOT = os.environ.get("HERMES_API_ROOT", "")
 AUTH_ROOT = os.environ.get('MEERKAT_AUTH_ROOT', 'http://nginx/auth')
-SERVER_AUTH_USERNAME = os.environ.get('SERVER_AUTH_USERNAME', 'root')
+SERVER_AUTH_USERNAME = os.environ.get('SERVER_AUTH_USERNAME', 'server')
 SERVER_AUTH_PASSWORD = os.environ.get('SERVER_AUTH_PASSWORD', 'password')
 
 
 def authenticate(username=SERVER_AUTH_USERNAME,
-                 password=SERVER_AUTH_PASSWORD):
+                 password=SERVER_AUTH_PASSWORD, current_token=None,
+                 jwt_algorithm=None, jwt_public_key=None):
     """
     Makes an authentication request to meerkat_auth using the specified
     username and password, or the server username and password by default by
@@ -21,6 +23,18 @@ def authenticate(username=SERVER_AUTH_USERNAME,
         str The JWT token.
     """
     # Assemble auth request params
+
+    if current_token:
+        if jwt_algorithm is None or jwt_public_key is None:
+            raise ValueError("With the current_cookie we need both jwt algorithm and public key.")
+        try:
+            jwt.decode(current_token,
+                       jwt_public_key,
+                       jwt_algorithm
+            )
+            return current_token
+        except jwt.ExpiredSignatureError:
+            logging.info("Getting new jwt token")
     url = AUTH_ROOT + '/api/login'
     data = {'username': username, 'password': password}
     headers = {'content-type': 'application/json'}
