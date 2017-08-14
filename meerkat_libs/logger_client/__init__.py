@@ -25,7 +25,6 @@ class FlaskActivityLogger:
             raise ValueError("No logging source type specified")
         if self.implementation is None:
             raise ValueError("No implementation type specified")
-        app.logger.info("setting up Logging clinent")
         logger = Logger(self.logging_url,
                         self.event_type,
                         self.source,
@@ -44,8 +43,6 @@ class FlaskActivityLogger:
         @request_finished.connect_via(app)
         def send_log_request(sender, response, **extra):
             try:
-                app.logger.debug("Sending log request")
-                app.logger.debug(request.path)
                 path = request.path#.split("/")[-1]
                 if not path:
                     path = "root"
