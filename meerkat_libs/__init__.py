@@ -75,10 +75,13 @@ def hermes(url, method, data={}):
        dict: a dictionary formed from the json data in the response.
     """
     # Assemble the request params.
+    if not HERMES_ROOT:
+        logging.warning("No Hermes ROOT set")
+        return
     url = HERMES_ROOT + url
     headers = {'content-type': 'application/json',
                'authorization': 'Bearer {}'.format(authenticate())}
-    logging.warning("Sending json: {}\nTo url: {}\nwith headers: {}".format(
+    logging.debug("Sending json: {}\nTo url: {}\nwith headers: {}".format(
                   json.dumps(data), url, headers))
 
     # Make the request and handle the response.
@@ -96,3 +99,5 @@ def hermes(url, method, data={}):
     except Exception as e:
         logging.error('Failed to convert Hermes response to json.')
         logging.error(e)
+
+
