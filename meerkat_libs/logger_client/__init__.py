@@ -11,12 +11,15 @@ from meerkat_libs.auth_client import JWT_ALGORITHM, JWT_PUBLIC_KEY
 class FlaskActivityLogger:
     def __init__(self, app, exclude=None):
         self.app = app
+
         self.logging_url = app.config.get("LOGGING_URL", None)
         self.source = app.config.get("LOGGING_SOURCE", None)
         self.source_type = app.config.get("LOGGING_SOURCE_TYPE", None)
         self.implementation = app.config.get("LOGGING_IMPLEMENTATION", None)
         self.event_type = "user_event"
-
+        self.send_log_events = app.config.get("SEND_LOGG_EVENTS", False)
+        if not self.send_log_events:
+            return
         if self.logging_url is None:
             raise ValueError("No logging URL specified")
         if self.source is None:
@@ -42,28 +45,29 @@ class FlaskActivityLogger:
             
         @request_finished.connect_via(app)
         def send_log_request(sender, response, **extra):
-            try:
-                path = request.path#.split("/")[-1]
-                if not path:
-                    path = "root"
-                
-                if path not in excluded and self.logging_url:
-                    print(path, excluded)
-                    status_code = logger.send(
-                        {"path": request.path,
-                         "base_url": request.base_url,
-                         "full_url": request.url,
-                         "status_code": response.status_code,
-                         "user": g.get("payload", {}).get("usr", None),
-                         "role": g.get("payload", {}).get("acc",
-                                                          {}).get(self.implementation,
-                                                                  []),
-                         "request_time": time.time() - g.time})
-                    if status_code != 200:
-                        self.app.logger.warning("Logging error, returned status code %s",
-                                                status_code)
-            except:
-                self.app.logger.warning("Logging error", exc_info=True)
+            if self.send_log_events:
+                try:
+                    path = request.path  # .split("/")[-1]
+                    if not path:
+                        path = "root"
+
+                    if path not in excluded and self.logging_url:
+                        print(path, excluded)
+                        status_code = logger.send(
+                            {"path": request.path,
+                             "base_url": request.base_url,
+                             "full_url": request.url,
+                             "status_code": response.status_code,
+                             "user": g.get("payload", {}).get("usr", None),
+                             "role": g.get("payload", {}).get("acc",
+                                                              {}).get(self.implementation,
+                                                                      []),
+                             "request_time": time.time() - g.time})
+                        if status_code != 200:
+                            self.app.logger.warning("Logging error, returned status code %s",
+                                                    status_code)
+                except:
+                    self.app.logger.warning("Logging error", exc_info=True)
 
                 
 class Logger:
