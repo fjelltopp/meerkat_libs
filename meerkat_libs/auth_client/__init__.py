@@ -242,7 +242,6 @@ class Authorise:
 
         # Get the jwt.
         token = Authorise.get_token()
-
         # If no token is found return an "not authenticated" message
         if not token:
             abort(401, not_authenticated)

@@ -2,16 +2,20 @@ import logging
 import requests
 import json
 import os
+import jwt
 
 # Configs from environment variables
 HERMES_ROOT = os.environ.get("HERMES_API_ROOT", "")
-AUTH_ROOT = os.environ.get('MEERKAT_AUTH_ROOT', 'http://dev_nginx_1/auth')
-SERVER_AUTH_USERNAME = os.environ.get('SERVER_AUTH_USERNAME', 'root')
+AUTH_ROOT = os.environ.get('MEERKAT_AUTH_ROOT', 'http://nginx/auth')
+SERVER_AUTH_USERNAME = os.environ.get('SERVER_AUTH_USERNAME', 'server')
 SERVER_AUTH_PASSWORD = os.environ.get('SERVER_AUTH_PASSWORD', 'password')
 
 
 def authenticate(username=SERVER_AUTH_USERNAME,
-                 password=SERVER_AUTH_PASSWORD):
+                 password=SERVER_AUTH_PASSWORD,
+                 current_token=None,
+                 jwt_algorithm=None,
+                 jwt_public_key=None):
     """
     Makes an authentication request to meerkat_auth using the specified
     username and password, or the server username and password by default by
@@ -20,6 +24,22 @@ def authenticate(username=SERVER_AUTH_USERNAME,
     Returns:
         str The JWT token.
     """
+
+    # Code by Gunnar.  Solving what purpose?
+    if current_token:
+        if jwt_algorithm is None or jwt_public_key is None:
+            raise ValueError("With the current_cookie we need "
+                             "both jwt algorithm and public key.")
+        try:
+            jwt.decode(
+                current_token,
+                jwt_public_key,
+                jwt_algorithm
+            )
+            return current_token
+        except jwt.ExpiredSignatureError:
+            logging.info("Getting new jwt token")
+
     # Assemble auth request params
     url = AUTH_ROOT + '/api/login'
     data = {'username': username, 'password': password}
@@ -54,11 +74,16 @@ def hermes(url, method, data={}):
     Returns:
        dict: a dictionary formed from the json data in the response.
     """
+    # If no Hermes root is set log a warning and don't bother to continue.
+    if not HERMES_ROOT:
+        logging.warning("No Hermes ROOT set")
+        return
+
     # Assemble the request params.
     url = HERMES_ROOT + url
     headers = {'content-type': 'application/json',
                'authorization': 'Bearer {}'.format(authenticate())}
-    logging.warning("Sending json: {}\nTo url: {}\nwith headers: {}".format(
+    logging.debug("Sending json: {}\nTo url: {}\nwith headers: {}".format(
                   json.dumps(data), url, headers))
 
     # Make the request and handle the response.
