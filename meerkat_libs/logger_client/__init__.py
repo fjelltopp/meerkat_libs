@@ -33,7 +33,7 @@ class FlaskActivityLogger:
                         self.source,
                         self.source_type,
                         self.implementation)
-        app.logger.info("Logging clinent setup")
+        app.logger.info("Logging client setup")
         app.logger.debug("Logging URL: %s", self.logging_url)
         
         @request_started.connect_via(app)
