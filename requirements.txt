@@ -4,3 +4,4 @@ blinker==1.4
 PyJWT==1.4.1
 passlib==1.6.5
 cryptography==1.4
+backoff==1.4.3
