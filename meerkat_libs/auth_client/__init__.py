@@ -225,6 +225,9 @@ class Authorise:
                 The latter only grants access if the user carries ALL of the
                 specified access levels.
         """
+        # If no access rules are specified, allow the user to pass.
+        if not access and not countries:
+            return
 
         # Only translate error strings if Bable is up and running.
         # Bable runs in Frontend not API - both import this module & can't fail
