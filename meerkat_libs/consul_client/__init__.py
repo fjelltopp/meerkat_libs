@@ -1,11 +1,12 @@
 import json
 import logging
+from os import environ
 
 import backoff as backoff
 import requests
 
-CONSUL_URL = "http://nginx/consul"
-
+CONSUL_URL = environ.get("CONSUL_URL", "http://nginx/consul")
+DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
 
 @backoff.on_exception(backoff.expo, requests.exceptions.ConnectionError, max_tries=8, max_value=30)
 def initialize_dhis2():
@@ -19,6 +20,8 @@ events_buffer = []
 
 
 def send_dhis2_events(uuid=None, raw_row=None, form_id=None):
+    if not DHIS2_EXPORT_ENABLED:
+        return
     global events_buffer
     upload_payload = {'token': '', 'content': 'record', 'formId': form_id, 'formVersion': '',
                       'data': raw_row,
@@ -37,7 +40,7 @@ def send_dhis2_events(uuid=None, raw_row=None, form_id=None):
             }
         }
     )
-    if len(events_buffer) > 1000:
+    if len(events_buffer) > 500:
         logging.info("Sending batch of events to consul.")
         json_payload = json.dumps(
             {"Messages": events_buffer}
