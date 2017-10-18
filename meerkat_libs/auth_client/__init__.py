@@ -2,16 +2,19 @@ from flask import abort, request, g
 from functools import wraps
 from jwt import InvalidTokenError
 from datetime import datetime
+from importlib import util
 import jwt
 import logging
 import os
 import requests
 
-# Need this module to be importable without the whole of meerkat_auth config.
-# Directly load the secret settings file from which to import configs.
+
+# Load the secret settings config file.
 # File must define JWT_COOKIE_NAME, JWT_ALGORITHM and JWT_PUBLIC_KEY variables.
 filename = os.environ.get('MEERKAT_AUTH_SETTINGS')
-exec(compile(open(filename, "rb").read(), filename, 'exec'))
+spec = util.spec_from_file_location('config', filename)
+config = util.module_from_spec(spec)
+spec.loader.exec_module(config)
 
 
 class Authorise:
@@ -110,19 +113,19 @@ class Authorise:
             The token or an empty string.
         """
         # Extract the token from the cookies
-        token = request.cookies.get(JWT_COOKIE_NAME)
+        token = request.cookies.get(config.JWT_COOKIE_NAME)
 
         # Extract the token from the headers if it doesn't exist in the cookies
         auth_headers = request.headers.get(
             'authorization',
             request.headers.get('Authorization', '')
         )
-        if not token and JWT_HEADER_PREFIX in auth_headers:
-            token = auth_headers[len(JWT_HEADER_PREFIX):]
+        if not token and config.JWT_HEADER_PREFIX in auth_headers:
+            token = auth_headers[len(config.JWT_HEADER_PREFIX):]
 
         # Extract the token from the GET args if it is still not found
         if not token:
-            token = request.args.get(JWT_COOKIE_NAME)
+            token = request.args.get(config.JWT_COOKIE_NAME)
 
         return token if token else ""
 
@@ -136,8 +139,8 @@ class Authorise:
         """
         return jwt.decode(
             token,
-            JWT_PUBLIC_KEY,
-            algorithms=[JWT_ALGORITHM]
+            config.JWT_PUBLIC_KEY,
+            algorithms=[config.JWT_ALGORITHM]
         )
 
     def get_user(self, token):
@@ -168,7 +171,7 @@ class Authorise:
             try:
                 logging.warning('No pre-existing user data. Fetching remotly.')
                 r = requests.post(
-                    AUTH_ROOT + '/api/get_user',
+                    config.AUTH_ROOT + '/api/get_user',
                     json={'jwt': token}
                 )
                 user_token = r.json()['jwt']
