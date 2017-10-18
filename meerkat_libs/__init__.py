@@ -3,7 +3,7 @@ import requests
 import json
 import os
 import jwt
-from auth_client import auth
+from meerkat_libs.auth_client import auth
 
 # Configs from environment variables
 HERMES_ROOT = os.environ.get("HERMES_API_ROOT", "")
