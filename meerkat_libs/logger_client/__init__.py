@@ -5,7 +5,6 @@ from flask import g, request
 from flask import request_started
 from flask import request_finished
 from meerkat_libs import authenticate
-from meerkat_libs.auth_client import JWT_ALGORITHM, JWT_PUBLIC_KEY
 
 
 class FlaskActivityLogger:
@@ -35,14 +34,14 @@ class FlaskActivityLogger:
                         self.implementation)
         app.logger.info("Logging client setup")
         app.logger.debug("Logging URL: %s", self.logging_url)
-        
+
         @request_started.connect_via(app)
         def request_start(sender, **extra):
             g.time = time.time()
         excluded = []
         if exclude:
             excluded = exclude
-            
+
         @request_finished.connect_via(app)
         def send_log_request(sender, response, **extra):
             if self.send_log_events:
@@ -53,23 +52,27 @@ class FlaskActivityLogger:
 
                     if path not in excluded and self.logging_url:
                         print(path, excluded)
-                        status_code = logger.send(
-                            {"path": request.path,
-                             "base_url": request.base_url,
-                             "full_url": request.url,
-                             "status_code": response.status_code,
-                             "user": g.get("payload", {}).get("usr", None),
-                             "role": g.get("payload", {}).get("acc",
-                                                              {}).get(self.implementation,
-                                                                      []),
-                             "request_time": time.time() - g.time})
+                        status_code = logger.send({
+                            "path": request.path,
+                            "base_url": request.base_url,
+                            "full_url": request.url,
+                            "status_code": response.status_code,
+                            "user": g.get("payload", {}).get("usr", None),
+                            "role": g.get("payload", {}).get(
+                                        "acc",
+                                        {}
+                                    ).get(self.implementation, []),
+                            "request_time": time.time() - g.time
+                        })
                         if status_code != 200:
-                            self.app.logger.warning("Logging error, returned status code %s",
-                                                    status_code)
+                            self.app.logger.warning(
+                                "Logging error, returned status code %s",
+                                status_code
+                            )
                 except:
                     self.app.logger.warning("Logging error", exc_info=True)
 
-                
+
 class Logger:
     def __init__(self, logging_url, event_type, source,
                  source_type, implementation):
@@ -78,13 +81,11 @@ class Logger:
         self.source_type = source_type
         self.implementation = implementation
         self.url = logging_url
-        self.jwt_auth_token = None# authenticate()
+        self.jwt_auth_token = None  # authenticate()
 
     def send(self, event_data):
-        self.jwt_auth_token = authenticate(current_token=self.jwt_auth_token,
-                                            jwt_algorithm=JWT_ALGORITHM,
-                                            jwt_public_key=JWT_PUBLIC_KEY)
-        
+        self.jwt_auth_token = authenticate(current_token=self.jwt_auth_token)
+
         return send_log(self.url,
                         self.event_type,
                         self.source,

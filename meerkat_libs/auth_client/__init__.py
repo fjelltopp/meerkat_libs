@@ -126,6 +126,20 @@ class Authorise:
 
         return token if token else ""
 
+    def decode_token(self, token):
+        """
+        Decodes the token according to the specified algorithm and key.
+        Raises an error if the the process fails.
+
+        Returns:
+            The decoded token
+        """
+        return jwt.decode(
+            token,
+            JWT_PUBLIC_KEY,
+            algorithms=[JWT_ALGORITHM]
+        )
+
     def get_user(self, token):
         """
         A function that get's the details of the specified user and combines it
@@ -139,22 +153,17 @@ class Authorise:
                 remote user token i.e. complete set of information about the
                 use specified in the token.
         """
+        payload = self.decode_token(token)
+
         # Clean all sessions.
         # If this process takes too long, it may need to be run in background.
         self.__clean_sessions()
-
-        # Decode the jwt.
-        payload = jwt.decode(
-            token,
-            JWT_PUBLIC_KEY,
-            algorithms=[JWT_ALGORITHM]
-        )
 
         # Get session
         session_key = '{}-{}'.format(payload['usr'], payload['exp'])
         session_value = self.SESSIONS.get(session_key, False)
 
-        # If session doesn't exist create session.
+        # If session doesn't exist create session and get new user details
         if not session_value:
             try:
                 logging.warning('No pre-existing user data. Fetching remotly.')
@@ -163,11 +172,7 @@ class Authorise:
                     json={'jwt': token}
                 )
                 user_token = r.json()['jwt']
-                user = jwt.decode(
-                    user_token,
-                    JWT_PUBLIC_KEY,
-                    algorithms=[JWT_ALGORITHM]
-                )
+                user = self.decode_token(user_token)
             except Exception as e:
                 logging.error(
                     "Failed to get remote user details: " + repr(e)
