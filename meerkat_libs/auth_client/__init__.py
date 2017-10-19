@@ -12,9 +12,13 @@ import requests
 # Load the secret settings config file.
 # File must define JWT_COOKIE_NAME, JWT_ALGORITHM and JWT_PUBLIC_KEY variables.
 filename = os.environ.get('MEERKAT_AUTH_SETTINGS')
-spec = util.spec_from_file_location('config', filename)
-config = util.module_from_spec(spec)
-spec.loader.exec_module(config)
+try:
+    spec = util.spec_from_file_location('config', filename)
+    config = util.module_from_spec(spec)
+    spec.loader.exec_module(config)
+except AttributeError:
+    logging.warning('Meerkat auth settings do not exist. '
+                    'Will not be able to work with auth tokens')
 
 
 class Authorise:
@@ -315,5 +319,4 @@ class Authorise:
 
 # Store an instance of the class in this module.
 # So it can be easily imported into other modules.
-logging.warning('Creating auth')
 auth = Authorise()
