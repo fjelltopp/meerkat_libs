@@ -2,16 +2,23 @@ from flask import abort, request, g
 from functools import wraps
 from jwt import InvalidTokenError
 from datetime import datetime
+from importlib import util
 import jwt
 import logging
 import os
 import requests
 
-# Need this module to be importable without the whole of meerkat_auth config.
-# Directly load the secret settings file from which to import configs.
+
+# Load the secret settings config file.
 # File must define JWT_COOKIE_NAME, JWT_ALGORITHM and JWT_PUBLIC_KEY variables.
 filename = os.environ.get('MEERKAT_AUTH_SETTINGS')
-exec(compile(open(filename, "rb").read(), filename, 'exec'))
+try:
+    spec = util.spec_from_file_location('config', filename)
+    config = util.module_from_spec(spec)
+    spec.loader.exec_module(config)
+except AttributeError:
+    logging.warning('Meerkat auth settings do not exist. '
+                    'Will not be able to work with auth tokens')
 
 
 class Authorise:
@@ -110,21 +117,35 @@ class Authorise:
             The token or an empty string.
         """
         # Extract the token from the cookies
-        token = request.cookies.get(JWT_COOKIE_NAME)
+        token = request.cookies.get(config.JWT_COOKIE_NAME)
 
         # Extract the token from the headers if it doesn't exist in the cookies
         auth_headers = request.headers.get(
             'authorization',
             request.headers.get('Authorization', '')
         )
-        if not token and JWT_HEADER_PREFIX in auth_headers:
-            token = auth_headers[len(JWT_HEADER_PREFIX):]
+        if not token and config.JWT_HEADER_PREFIX in auth_headers:
+            token = auth_headers[len(config.JWT_HEADER_PREFIX):]
 
         # Extract the token from the GET args if it is still not found
         if not token:
-            token = request.args.get(JWT_COOKIE_NAME)
+            token = request.args.get(config.JWT_COOKIE_NAME)
 
         return token if token else ""
+
+    def decode_token(self, token):
+        """
+        Decodes the token according to the specified algorithm and key.
+        Raises an error if the the process fails.
+
+        Returns:
+            The decoded token
+        """
+        return jwt.decode(
+            token,
+            config.JWT_PUBLIC_KEY,
+            algorithms=[config.JWT_ALGORITHM]
+        )
 
     def get_user(self, token):
         """
@@ -139,35 +160,26 @@ class Authorise:
                 remote user token i.e. complete set of information about the
                 use specified in the token.
         """
+        payload = self.decode_token(token)
+
         # Clean all sessions.
         # If this process takes too long, it may need to be run in background.
         self.__clean_sessions()
-
-        # Decode the jwt.
-        payload = jwt.decode(
-            token,
-            JWT_PUBLIC_KEY,
-            algorithms=[JWT_ALGORITHM]
-        )
 
         # Get session
         session_key = '{}-{}'.format(payload['usr'], payload['exp'])
         session_value = self.SESSIONS.get(session_key, False)
 
-        # If session doesn't exist create session.
+        # If session doesn't exist create session and get new user details
         if not session_value:
             try:
                 logging.warning('No pre-existing user data. Fetching remotly.')
                 r = requests.post(
-                    AUTH_ROOT + '/api/get_user',
+                    config.AUTH_ROOT + '/api/get_user',
                     json={'jwt': token}
                 )
                 user_token = r.json()['jwt']
-                user = jwt.decode(
-                    user_token,
-                    JWT_PUBLIC_KEY,
-                    algorithms=[JWT_ALGORITHM]
-                )
+                user = self.decode_token(user_token)
             except Exception as e:
                 logging.error(
                     "Failed to get remote user details: " + repr(e)
@@ -225,6 +237,9 @@ class Authorise:
                 The latter only grants access if the user carries ALL of the
                 specified access levels.
         """
+        # If no access rules are specified, allow the user to pass.
+        if not access and not countries:
+            return
 
         # Only translate error strings if Bable is up and running.
         # Bable runs in Frontend not API - both import this module & can't fail
@@ -304,5 +319,4 @@ class Authorise:
 
 # Store an instance of the class in this module.
 # So it can be easily imported into other modules.
-logging.warning('Creating auth')
 auth = Authorise()
