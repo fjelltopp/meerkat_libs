@@ -62,7 +62,7 @@ def authenticate(username=SERVER_AUTH_USERNAME,
         logging.error(e)
 
 
-def hermes(url, method, data={}):
+def hermes(url, method, data={}, HERMES_ROOT=HERMES_ROOT):
     """
     Makes a Hermes API request.
     Args:
