@@ -76,20 +76,23 @@ def hermes(url, method, data={}, config=None):
     # If no Hermes root is set log a warning and don't bother to continue.
 
     if config:
-        HERMES_ROOT = config.hermes_api_root
-        SERVER_AUTH_USERNAME = config.server_auth_username
-        SERVER_AUTH_PASSWORD = config.server_auth_password
-    
-    if not HERMES_ROOT:
+        hermes_root = config.hermes_api_root
+        server_auth_username = config.server_auth_username
+        server_auth_password = config.server_auth_password
+    else:
+        hermes_root = HERMES_ROOT
+        server_auth_username = SERVER_AUTH_USERNAME
+        server_auth_password = SERVER_AUTH_PASSWORD
+    if not hermes_root:
         logging.warning("No Hermes ROOT set")
         return
 
     # Assemble the request params.
-    url = HERMES_ROOT + url
+    url = hermes_root + url
     headers = {'content-type': 'application/json',
                'authorization': 'Bearer {}'.format(authenticate(
-                   username=SERVER_AUTH_USERNAME,
-                   password=SERVER_AUTH_PASSWORD))}
+                   username=server_auth_username,
+                   password=server_auth_password))}
     logging.debug("Sending json: {}\nTo url: {}\nwith headers: {}".format(
                   json.dumps(data), url, headers))
 
