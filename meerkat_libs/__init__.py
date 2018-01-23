@@ -62,7 +62,7 @@ def authenticate(username=SERVER_AUTH_USERNAME,
         logging.error(e)
 
 
-def hermes(url, method, data={}, HERMES_ROOT=HERMES_ROOT):
+def hermes(url, method, data={}, config=None):
     """
     Makes a Hermes API request.
     Args:
@@ -74,6 +74,12 @@ def hermes(url, method, data={}, HERMES_ROOT=HERMES_ROOT):
        dict: a dictionary formed from the json data in the response.
     """
     # If no Hermes root is set log a warning and don't bother to continue.
+
+    if config:
+        HERMES_ROOT = config.hermes_api_root
+        SERVER_AUTH_USERNAME = config.server_auth_username
+        SERVER_AUTH_PASSWORD = config.server_auth_password
+    
     if not HERMES_ROOT:
         logging.warning("No Hermes ROOT set")
         return
@@ -81,7 +87,9 @@ def hermes(url, method, data={}, HERMES_ROOT=HERMES_ROOT):
     # Assemble the request params.
     url = HERMES_ROOT + url
     headers = {'content-type': 'application/json',
-               'authorization': 'Bearer {}'.format(authenticate())}
+               'authorization': 'Bearer {}'.format(authenticate(
+                   username=SERVER_AUTH_USERNAME,
+                   password=SERVER_AUTH_PASSWORD))}
     logging.debug("Sending json: {}\nTo url: {}\nwith headers: {}".format(
                   json.dumps(data), url, headers))
 
