@@ -14,6 +14,7 @@ SERVER_AUTH_PASSWORD = os.environ.get('SERVER_AUTH_PASSWORD', 'password')
 
 def authenticate(username=SERVER_AUTH_USERNAME,
                  password=SERVER_AUTH_PASSWORD,
+                 auth_root=AUTH_ROOT,
                  current_token=None):
     """
     Makes an authentication request to meerkat_auth using the specified
@@ -40,7 +41,7 @@ def authenticate(username=SERVER_AUTH_USERNAME,
             logging.info("Current token expired. Getting new token.")
 
     # Assemble auth request params
-    url = AUTH_ROOT + '/api/login'
+    url = auth_root + '/api/login'
     data = {'username': username, 'password': password}
     headers = {'content-type': 'application/json'}
 
@@ -79,10 +80,12 @@ def hermes(url, method, data={}, config=None):
         hermes_root = config.hermes_api_root
         server_auth_username = config.server_auth_username
         server_auth_password = config.server_auth_password
+        auth_root = config.auth_root
     else:
         hermes_root = HERMES_ROOT
         server_auth_username = SERVER_AUTH_USERNAME
         server_auth_password = SERVER_AUTH_PASSWORD
+        auth_root = AUTH_ROOT
     if not hermes_root:
         logging.warning("No Hermes ROOT set")
         return
@@ -91,6 +94,7 @@ def hermes(url, method, data={}, config=None):
     url = hermes_root + url
     headers = {'content-type': 'application/json',
                'authorization': 'Bearer {}'.format(authenticate(
+                   auth_root=auth_root,
                    username=server_auth_username,
                    password=server_auth_password))}
     logging.debug("Sending json: {}\nTo url: {}\nwith headers: {}".format(
