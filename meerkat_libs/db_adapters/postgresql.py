@@ -1,5 +1,6 @@
 import psycopg2
 import logging
+import json
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2 import sql
 from psycopg2.extras import Json
@@ -155,9 +156,21 @@ class PostgreSQLAdapter():
         ))
 
         # Securely build sql query to avoid sql injection.
-        query = sql.SQL("INSERT INTO {} VALUES ({});").format(
+        query = sql.SQL("INSERT INTO {} VALUES ({})").format(
             sql.Identifier(table),
             values
+        )
+        # Write should UPSERT i.e. it should overwrite if key already exists.
+        updates = sql.SQL("{}.data").format(sql.Identifier(table))
+        for attribute, value in attributes.items():
+            updates = sql.SQL("jsonb_set({}, '{{{}}}', {})").format(
+                updates,
+                sql.Identifier(attribute),
+                sql.Literal(json.dumps(value))
+            )
+        query += sql.SQL(" ON CONFLICT ({}) DO UPDATE SET data={};").format(
+            sql.SQL(", ").join([sql.Identifier(x) for x in self.keys[table]]),
+            updates
         )
         logging.debug("Write query: {}".format(query.as_string(self.conn)))
 
