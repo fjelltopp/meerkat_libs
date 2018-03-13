@@ -12,6 +12,7 @@ class PostgreSQLAdapter():
         self.structure = structure
         self.user = user
         self.host = host
+        self.keys = self._extract_keys()
 
     def drop(self):
         try:
@@ -28,11 +29,10 @@ class PostgreSQLAdapter():
 
             conn.close()
 
-        except psycopg2.OperationalError:
-            logging.info("No database exists to drop.")
+        except psycopg2.ProgrammingError:
+            logging.info("No tables exists to drop.")
 
     def setup(self):
-        # TODO: Backoff until postgres container running.
         self._create_db()
         self._create_tables()
 
@@ -46,6 +46,12 @@ class PostgreSQLAdapter():
             results = [x[0] for x in cur.fetchall()]
             cur.close()
             logging.info(results)
+
+    def _extract_keys(self):
+        keys = {}
+        for table, structure in self.structure.items():
+            keys[table] = [x[0] for x in structure if x[0] != 'data']
+        return keys
 
     def _create_db(self):
         try:
@@ -191,20 +197,29 @@ class PostgreSQLAdapter():
         else:
             attributes = sql.SQL("data")
 
-        # Securely compose sql list of conditions.
-        for field, values in conditions:
-            condition = sql.SQL(" where data->>{} in ({});").format(
-                sql.Identifier(field),
-                sql.SQL(", ").join([sql.Literal(x) for x in values])
-            )
+        sql_conditions = []
+
+        # Convert conditions securly into SQL string
+        if conditions:
+            for field, values in conditions.items():
+                for value in values:
+                    sql_conditions.append(
+                        sql.SQL("data#>'{{{}}}' ? {}").format(
+                            sql.SQL(field),
+                            sql.Literal(value)
+                        )
+                    )
+            sql_conditions = sql.SQL(' OR ').join(sql_conditions)
+            sql_conditions = sql.SQL(' WHERE ') + sql_conditions
+
         else:
-            condition = sql.SQL("")
+            sql_conditions = sql.SQL("")
 
         # Securely build sql query to avoid sql injection.
         query = sql.SQL("SELECT {} from {}{};").format(
             attributes,
             sql.Identifier(table),
-            condition
+            sql_conditions
         )
         logging.debug("Read query: {}".format(query.as_string(self.conn)))
 
