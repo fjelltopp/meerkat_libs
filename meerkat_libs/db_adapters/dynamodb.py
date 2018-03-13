@@ -7,11 +7,18 @@ class DynamoDBAdapter():
     def __init__(self, db_url, structure):
         self.structure = structure
         self.db_url = db_url
+        self.keys = self._extract_keys()
         self.conn = boto3.resource(
             'dynamodb',
             endpoint_url=db_url,
             region_name='eu-west-1'
         )
+
+    def _extract_keys(self):
+        keys = {}
+        for table, structure in self.structure.items():
+            keys[table] = [key['AttributeName'] for key in structure['KeySchema']]
+        return keys
 
     def drop(self):
         logging.info('Cleaning the dev db.')
@@ -40,7 +47,10 @@ class DynamoDBAdapter():
 
     def write(self, table, keys, attributes):
         for key, value in attributes.items():
-            attributes[key] = {'Value': value, 'Action': 'PUT'}
+            if value is None:
+                attributes[key] = {'Value': value, 'Action': 'DELETE'}
+            else:
+                attributes[key] = {'Value': value, 'Action': 'PUT'}
         table = self.conn.Table(table)
         return table.update_item(
             Key=keys,
@@ -55,7 +65,7 @@ class DynamoDBAdapter():
         return response
 
     def get_all(self, table, conditions={}, attributes=[]):
-        table = self.conn.Table(table)
+        db_table = self.conn.Table(table)
 
         # Assemble scan arguments programatically, by building a dictionary.
         kwargs = {}
@@ -67,20 +77,24 @@ class DynamoDBAdapter():
 
         if not conditions:
             # If no conditions are specified, get all users and return as list.
-            return table.scan(**kwargs).get("Items", [])
+            return db_table.scan(**kwargs).get("Items", [])
 
         else:
-            items = []
+            items = {}
             # Load data separately for each country
             # ...because Scan can't perform OR on CONTAINS
-            for field, values in conditions:
-                kwargs["ScanFilter"] = {
-                    field: {
-                        'AttributeValueList': values,
-                        'ComparisonOperator': 'CONTAINS'
+            for field, values in conditions.items():
+                for value in values:
+                    kwargs["ScanFilter"] = {
+                        field: {
+                            'AttributeValueList': [value],
+                            'ComparisonOperator': 'CONTAINS'
+                        }
                     }
-                }
-                items += table.scan(**kwargs).get("Items", [])
 
-            # Return a list of results without duplicates
-            return [dict(t) for t in set([tuple(d.items()) for d in items])]
+                    # Get and combine the users together in a no-duplications dict.
+                    for item in db_table.scan(**kwargs).get("Items", []):
+                        key = ''.join([item[k] for k in self.keys[table]])
+                        items[key] = item
+
+            return list(items.values())
