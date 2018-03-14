@@ -20,7 +20,7 @@ class DynamoDBAdapter():
             keys[table] = [key['AttributeName'] for key in structure['KeySchema']]
         return keys
 
-    def drop(self):
+    def drop_all_tables(self):
         logging.info('Cleaning the dev db.')
         for table in self.structure.keys():
             try:
@@ -64,28 +64,28 @@ class DynamoDBAdapter():
             raise Exception("DynamoDB response not 200")
         return response
 
-    def get_all(self, table, conditions={}, attributes=[]):
-        db_table = self.conn.Table(table)
+    def get_all(self, table_name, filters={}, attributes=[]):
+        db_table = self.conn.Table(table_name)
 
         # Assemble scan arguments programatically, by building a dictionary.
-        kwargs = {}
+        scan_kwargs = {}
 
         # Include AttributesToGet if any are specified.
         # By not including them we get them all.
         if attributes:
-            kwargs["AttributesToGet"] = attributes
+            scan_kwargs["AttributesToGet"] = attributes
 
-        if not conditions:
-            # If no conditions are specified, get all users and return as list.
-            return db_table.scan(**kwargs).get("Items", [])
+        if not filters:
+            # If no filters are specified, get all users and return as list.
+            return db_table.scan(**scan_kwargs).get("Items", [])
 
         else:
             items = {}
             # Load data separately for each country
             # ...because Scan can't perform OR on CONTAINS
-            for field, values in conditions.items():
+            for field, values in filters.items():
                 for value in values:
-                    kwargs["ScanFilter"] = {
+                    scan_kwargs["ScanFilter"] = {
                         field: {
                             'AttributeValueList': [value],
                             'ComparisonOperator': 'CONTAINS'
@@ -93,8 +93,8 @@ class DynamoDBAdapter():
                     }
 
                     # Get and combine the users together in a no-duplications dict.
-                    for item in db_table.scan(**kwargs).get("Items", []):
-                        key = ''.join([item[k] for k in self.keys[table]])
+                    for item in db_table.scan(**scan_kwargs).get("Items", []):
+                        key = ''.join([item[k] for k in self.keys[table_name]])
                         items[key] = item
 
             return list(items.values())
