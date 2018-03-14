@@ -15,7 +15,7 @@ class PostgreSQLAdapter():
         self.host = host
         self.keys = self._extract_keys()
 
-    def drop(self):
+    def drop_all_tables(self):
         try:
             logging.info("Dropping tables")
             conn = psycopg2.connect(
@@ -34,19 +34,8 @@ class PostgreSQLAdapter():
             logging.info("No tables exists to drop.")
 
     def setup(self):
-        self._create_db()
-        self._create_tables()
-
-    def list(self):
-        for table in self.structure.keys():
-            logging.info("Listing all records in {} table".format(table))
-            cur = self.conn().cursor()
-            cur.execute(sql.SQL("SELECT data from {}").format(
-                sql.Identifier(table)
-            ))
-            results = [x[0] for x in cur.fetchall()]
-            cur.close()
-            logging.info(results)
+        self._create_db_if_needed()
+        self._create_tables_if_needed()
 
     def _extract_keys(self):
         keys = {}
@@ -54,63 +43,69 @@ class PostgreSQLAdapter():
             keys[table] = [x[0] for x in structure if x[0] != 'data']
         return keys
 
-    def _create_db(self):
+    def _create_db_if_needed(self):
         try:
-            logging.info("Checking if db exist.")
+            logging.info("Trying to connect to the DB.")
             self.conn = psycopg2.connect(
                 dbname=self.db_name,
                 user=self.user,
                 host=self.host
             )
-            logging.info("DB exists.")
+            logging.info("Connection esablished.")
 
         except psycopg2.OperationalError:
-            logging.info("DB needs to be created.")
-            conn = psycopg2.connect(
-                dbname="postgres",
-                user=self.user,
-                host=self.host
-            )
-            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-            conn.cursor().execute("CREATE DATABASE "+self.db_name)
-            conn.commit()
-            conn.close()
-            self.conn = psycopg2.connect(
-                dbname=self.db_name,
-                user=self.user,
-                host=self.host
-            )
-            logging.info("DB created and connection established.")
-            self._create_tables()
+            logging.info("Failed to connect. DB needs to be created.")
+            self._create_db()
 
-    def _create_tables(self):
-        for table, structure in self.structure.items():
+    def _create_db(self):
+        logging.info("Creating the DB")
+        conn = psycopg2.connect(
+            dbname="postgres",
+            user=self.user,
+            host=self.host
+        )
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        conn.cursor().execute("CREATE DATABASE "+self.db_name)
+        conn.commit()
+        conn.close()
+        self.conn = psycopg2.connect(
+            dbname=self.db_name,
+            user=self.user,
+            host=self.host
+        )
+        logging.info("DB created and connection established.")
+
+    def _create_tables_if_needed(self):
+        for table_name, structure in self.structure.items():
             # Only create non-existant tables, so first check if table exists.
             try:
-                logging.info("Checking if table {} exists.".format(table))
+                logging.info("Checking if table {} exists.".format(table_name))
                 cur = self.conn.cursor()
                 cur.execute(sql.SQL("SELECT * FROM {} LIMIT 1;").format(
-                    sql.Identifier(table)  # Always protect constructed SQL
+                    sql.Identifier(table_name)  # Always protect constructed SQL
                 ))
-                logging.info("Table {} exists.".format(table))
+                logging.info("Table {} exists.".format(table_name))
 
             except psycopg2.ProgrammingError:
-                logging.info("Table {} needs to be created.".format(table))
-                # Construct secure SQL query.
-                structure = sql.SQL(", ").join(map(lambda x: x[1], structure))
-                query = sql.SQL("CREATE TABLE {} ({});").format(
-                    sql.Identifier(table),
-                    structure
-                )
-                logging.debug("Create query: ".format(query.as_string(self.conn)))
+                self._create_table(table_name, structure)
 
-                # Create a cursor and execute the table creation DB query.
-                self.conn.rollback()
-                cur = self.conn.cursor()
-                cur.execute(query)
-                self.conn.commit()
+    def _create_table(self, table_name, structure):
+        logging.info("Table {} needs to be created.".format(table_name))
+        # Construct secure SQL query.
+        structure = sql.SQL(", ").join(map(lambda x: x[1], structure))
+        query = sql.SQL("CREATE TABLE {} ({});").format(
+            sql.Identifier(table_name),
+            structure
+        )
+        logging.debug("Create query: ".format(query.as_string(self.conn)))
 
-                logging.info("Table {} created".format(table))
+        # Create a cursor and execute the table creation DB query.
+        self.conn.rollback()
+        cur = self.conn.cursor()
+        cur.execute(query)
+        self.conn.commit()
+
+        logging.info("Table {} created".format(table_name))
 
     def read(self, table, key, attributes=[]):
         # Securely SQL stringify the attributes
@@ -200,7 +195,7 @@ class PostgreSQLAdapter():
         self.conn.commit()
         cur.close()
 
-    def get_all(self, table, conditions={}, attributes=[]):
+    def get_all(self, table_name, filters={}, attributes=[]):
         # Securely compose sql list of attributes.
         if attributes:
             attributes = sql.SQL(", ").join(map(
@@ -212,9 +207,9 @@ class PostgreSQLAdapter():
 
         sql_conditions = []
 
-        # Convert conditions securly into SQL string
-        if conditions:
-            for field, values in conditions.items():
+        # Convert filters securly into SQL string
+        if filters:
+            for field, values in filters.items():
                 for value in values:
                     sql_conditions.append(
                         sql.SQL("data#>'{{{}}}' ? {}").format(
@@ -231,7 +226,7 @@ class PostgreSQLAdapter():
         # Securely build sql query to avoid sql injection.
         query = sql.SQL("SELECT {} from {}{};").format(
             attributes,
-            sql.Identifier(table),
+            sql.Identifier(table_name),
             sql_conditions
         )
         logging.debug("Read query: {}".format(query.as_string(self.conn)))
@@ -241,6 +236,6 @@ class PostgreSQLAdapter():
         cur = self.conn.cursor()
         cur.execute(query)
         results = cur.fetchall()
-        results = [x[0] for x in results]
+        results = [r[0] for r in results]
         cur.close()
         return results
