@@ -8,17 +8,19 @@ class DynamoDBAdapter():
         self.structure = structure
         self.db_url = db_url
         self.keys = self._extract_keys()
-        self.conn = boto3.resource(
-            'dynamodb',
-            endpoint_url=db_url,
-            region_name='eu-west-1'
-        )
 
     def _extract_keys(self):
         keys = {}
         for table, structure in self.structure.items():
             keys[table] = [key['AttributeName'] for key in structure['KeySchema']]
         return keys
+
+    def connect_to_db(self):
+        self.conn = boto3.resource(
+            'dynamodb',
+            endpoint_url=self.db_url,
+            region_name='eu-west-1'
+        )
 
     def drop_all_tables(self):
         logging.info('Cleaning the dev db.')

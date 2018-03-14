@@ -8,26 +8,19 @@ from psycopg2.extras import Json
 
 class PostgreSQLAdapter():
 
-    def __init__(self, db_name, structure, user='postgres', host='db'):
-        self.db_name = db_name
+    def __init__(self, connection_dsn, root_connection_dsn, structure):
         self.structure = structure
-        self.user = user
-        self.host = host
+        self.connection_dsn = connection_dsn
+        self.root_connection_dsn = root_connection_dsn
         self.keys = self._extract_keys()
 
     def drop_all_tables(self):
         try:
             logging.info("Dropping tables")
-            conn = psycopg2.connect(
-                dbname=self.db_name,
-                user=self.user,
-                host=self.host
-            )
-
+            conn = psycopg2.connect(self.connection_dsn)
             for table in self.structure.keys():
                 conn.cursor().execute("DROP TABLE {};".format(table))
                 conn.commit()
-
             conn.close()
 
         except psycopg2.ProgrammingError:
@@ -37,6 +30,11 @@ class PostgreSQLAdapter():
         self._create_db_if_needed()
         self._create_tables_if_needed()
 
+    def connect_to_db(self):
+        logging.info("Trying to connect to the DB.")
+        self.conn = psycopg2.connect(self.connection_dsn)
+        logging.info("Connection esablished.")
+
     def _extract_keys(self):
         keys = {}
         for table, structure in self.structure.items():
@@ -45,35 +43,19 @@ class PostgreSQLAdapter():
 
     def _create_db_if_needed(self):
         try:
-            logging.info("Trying to connect to the DB.")
-            self.conn = psycopg2.connect(
-                dbname=self.db_name,
-                user=self.user,
-                host=self.host
-            )
-            logging.info("Connection esablished.")
-
+            self.connect_to_db()
         except psycopg2.OperationalError:
             logging.info("Failed to connect. DB needs to be created.")
             self._create_db()
 
     def _create_db(self):
         logging.info("Creating the DB")
-        conn = psycopg2.connect(
-            dbname="postgres",
-            user=self.user,
-            host=self.host
-        )
+        conn = psycopg2.connect(self.root_connection_dsn)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         conn.cursor().execute("CREATE DATABASE "+self.db_name)
         conn.commit()
         conn.close()
-        self.conn = psycopg2.connect(
-            dbname=self.db_name,
-            user=self.user,
-            host=self.host
-        )
-        logging.info("DB created and connection established.")
+        self.connect_to_db()
 
     def _create_tables_if_needed(self):
         for table_name, structure in self.structure.items():
