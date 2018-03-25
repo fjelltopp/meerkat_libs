@@ -6,7 +6,7 @@ import jwt
 from meerkat_libs.auth_client import auth
 
 # Configs from environment variables
-HERMES_ROOT = os.environ.get("HERMES_API_ROOT", "")
+HERMES_ROOT = os.environ.get("HERMES_API_ROOT", "http://nginx/hermes")
 AUTH_ROOT = os.environ.get('MEERKAT_AUTH_ROOT', 'http://nginx/auth')
 SERVER_AUTH_USERNAME = os.environ.get('SERVER_AUTH_USERNAME', 'server')
 SERVER_AUTH_PASSWORD = os.environ.get('SERVER_AUTH_PASSWORD', 'password')

@@ -1,6 +1,8 @@
 import psycopg2
 import logging
 import json
+import traceback
+from functools import wraps
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2 import sql
 from psycopg2.extras import Json
@@ -9,6 +11,7 @@ from psycopg2.extras import Json
 class PostgreSQLAdapter():
 
     def __init__(self, connection_dsn, root_connection_dsn, structure):
+        print(structure)
         self.structure = structure
         self.connection_dsn = connection_dsn
         self.root_connection_dsn = root_connection_dsn
@@ -50,9 +53,12 @@ class PostgreSQLAdapter():
 
     def _create_db(self):
         logging.info("Creating the DB")
+        dsn = self.connection_dsn
+        db_details = dict(s.replace('\'', '').split("=") for s in dsn.split())
+        db_name = sql.Identifier(db_details['dbname'])
         conn = psycopg2.connect(self.root_connection_dsn)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-        conn.cursor().execute("CREATE DATABASE "+self.db_name)
+        conn.cursor().execute("CREATE DATABASE "+db_name)
         conn.commit()
         conn.close()
         self.connect_to_db()
@@ -89,6 +95,17 @@ class PostgreSQLAdapter():
 
         logging.info("Table {} created".format(table_name))
 
+    def rollback_on_error(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception:
+                args[0].conn.rollback()
+                traceback.print_exc()
+        return decorated
+
+    @rollback_on_error
     def read(self, table, key, attributes=[]):
         # Securely SQL stringify the attributes
         if attributes:
@@ -122,6 +139,7 @@ class PostgreSQLAdapter():
         else:
             return None  # The result may not exist
 
+    @rollback_on_error
     def write(self, table, key, attributes):
         # Add the key data to the json blob.
         attributes = {**key, **attributes}
@@ -157,6 +175,7 @@ class PostgreSQLAdapter():
         self.conn.commit()
         cur.close()
 
+    @rollback_on_error
     def delete(self, table, key):
         # Securely SQL stringify the conditions
         conditions = sql.SQL(" AND ").join(map(
@@ -177,15 +196,16 @@ class PostgreSQLAdapter():
         self.conn.commit()
         cur.close()
 
+    @rollback_on_error
     def get_all(self, table_name, filters={}, attributes=[]):
         # Securely compose sql list of attributes.
         if attributes:
-            attributes = sql.SQL(", ").join(map(
+            sql_attributes = sql.SQL(", ").join(map(
                 lambda x: sql.SQL("data->>{}").format(sql.Literal(x)),
                 attributes
             ))
         else:
-            attributes = sql.SQL("data")
+            sql_attributes = sql.SQL("data")
 
         sql_conditions = []
 
@@ -207,7 +227,7 @@ class PostgreSQLAdapter():
 
         # Securely build sql query to avoid sql injection.
         query = sql.SQL("SELECT {} from {}{};").format(
-            attributes,
+            sql_attributes,
             sql.Identifier(table_name),
             sql_conditions
         )
@@ -218,6 +238,18 @@ class PostgreSQLAdapter():
         cur = self.conn.cursor()
         cur.execute(query)
         results = cur.fetchall()
-        results = [r[0] for r in results]
         cur.close()
+
+        # Format results as a list of dictionaries containing requested data
+        def try_json(string):
+            try:
+                return json.loads(string)
+            except json.decoder.JSONDecodeError:
+                return string
+
+        if attributes:
+            results = [dict(zip(attributes, map(try_json, r))) for r in results]
+        else:
+            results = [r[0] for r in results]
+
         return results
