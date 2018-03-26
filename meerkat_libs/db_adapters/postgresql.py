@@ -110,9 +110,9 @@ class PostgreSQLAdapter():
         # Securely SQL stringify the attributes
         if attributes:
             tmp = [sql.SQL("data->>{}").format(sql.Literal(a)) for a in attributes]
-            attributes = sql.SQL(", ").join(tmp)
+            sql_attributes = sql.SQL(", ").join(tmp)
         else:
-            attributes = sql.SQL("data")
+            sql_attributes = sql.SQL("data")
 
         # Securely SQL stringify the conditions
         conds = []
@@ -122,7 +122,7 @@ class PostgreSQLAdapter():
 
         # Form the secure SQL query
         query = sql.SQL("SELECT {} from {} where {};").format(
-            attributes,
+            sql_attributes,
             sql.Identifier(table),
             conditions
         )
@@ -134,10 +134,23 @@ class PostgreSQLAdapter():
         cur.execute(query)
         result = cur.fetchone()
         cur.close()
-        if result:
-            return result[0]
+
+        # Format results as a list of dictionaries containing requested data
+        def try_json(string):
+            try:
+                return json.loads(string)
+            except json.decoder.JSONDecodeError:
+                return string
+
+        # If attributes are specified, put the dictionary back together.
+        if result and attributes:
+            return dict(zip(attributes, map(try_json, result)))
+        # If just getting all JSON data, dictionary is already built.
+        elif result:
+           return result[0]
+        # There may be no results to return
         else:
-            return None  # The result may not exist
+           return None
 
     @rollback_on_error
     def write(self, table, key, attributes):
