@@ -211,14 +211,23 @@ class PostgreSQLAdapter():
 
         # Convert filters securly into SQL string
         if filters:
-            for field, values in filters.items():
-                for value in values:
+            for field, condition in filters.items():
+                if isinstance(condition, list):
+                    for value in condition:
+                        sql_conditions.append(
+                            sql.SQL("data#>'{{{}}}' ? {}").format(
+                                sql.SQL(field),
+                                sql.Literal(value)
+                            )
+                        )
+                else:
                     sql_conditions.append(
-                        sql.SQL("data#>'{{{}}}' ? {}").format(
+                        sql.SQL("data->>'{}'={}").format(
                             sql.SQL(field),
-                            sql.Literal(value)
+                            sql.Literal(condition)
                         )
                     )
+
             sql_conditions = sql.SQL(' OR ').join(sql_conditions)
             sql_conditions = sql.SQL(' WHERE ') + sql_conditions
 
@@ -231,7 +240,7 @@ class PostgreSQLAdapter():
             sql.Identifier(table_name),
             sql_conditions
         )
-        logging.debug("Read query: {}".format(query.as_string(self.conn)))
+        logging.warning("Read query: {}".format(query.as_string(self.conn)))
 
         # Execute and fetch only JSON data as a list of dicts
         # (Don't need key data as it is merged into JSON data during db write.)
