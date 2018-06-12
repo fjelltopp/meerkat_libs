@@ -3,6 +3,6 @@ requests==2.8.1
 blinker==1.4
 PyJWT==1.4.1
 passlib==1.6.5
-cryptography==1.4
+cryptography==2.2.2
 backoff==1.4.3
 psycopg2-binary==2.7.4
