@@ -11,8 +11,10 @@ DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
 
 @backoff.on_exception(backoff.expo, requests.exceptions.ConnectionError, max_tries=8, max_value=30)
 def initialize_dhis2():
+    if not DHIS2_EXPORT_ENABLED:
+        return
     logging.info("Initializing consul publisher")
-    requests.post(CONSUL_URL + '/dhis2/export/locationTree')
+    # requests.post(CONSUL_URL + '/dhis2/export/locationTree')
     requests.post(CONSUL_URL + '/dhis2/export/formFields')
     logging.info("DONE: Initializing consul publisher")
 
