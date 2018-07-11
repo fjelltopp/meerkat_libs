@@ -1,19 +1,26 @@
 import json
 import logging
+import jwt
 from os import environ
 
 import backoff as backoff
 import requests
 
+from meerkat_libs import authenticate
+
 CONSUL_URL = environ.get("CONSUL_URL", "http://nginx/consul")
 DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
-
+CONSUL_AUTH_USERNAME = environ.get('CONSUL_AUTH_USERNAME', 'consul-dev-user')
+CONSUL_AUTH_PASSWORD = environ.get('CONSUL_AUTH_PASSWORD', 'password')
 
 @backoff.on_exception(backoff.expo, requests.exceptions.ConnectionError, max_tries=8, max_value=30)
 def initialize_dhis2():
+    if not DHIS2_EXPORT_ENABLED:
+        return
     logging.info("Initializing consul publisher")
-    requests.post(CONSUL_URL + '/dhis2/export/locationTree')
-    requests.post(CONSUL_URL + '/dhis2/export/formFields')
+    headers = _auth_headers()
+    # requests.post(CONSUL_URL + '/dhis2/export/locationTree', headers=_auth_headers())
+    # requests.post(CONSUL_URL + '/dhis2/export/formFields', headers=_auth_headers())
     logging.info("DONE: Initializing consul publisher")
 
 
@@ -58,5 +65,11 @@ def __send_events_from_buffer():
     json_payload = json.dumps(
         {"Messages": events_buffer}
     )
-    requests.post(CONSUL_URL + "/dhis2/export/events", json=json_payload)
+    requests.post(CONSUL_URL + "/dhis2/export/events", headers=_auth_headers(), json=json_payload)
     events_buffer = []
+
+
+def _auth_headers():
+    jwt_token_ = authenticate(CONSUL_AUTH_USERNAME, CONSUL_AUTH_PASSWORD)
+    headers = {'authorization': f"Bearer {jwt_token_}"}
+    return headers
