@@ -10,6 +10,7 @@ import requests
 from meerkat_libs import authenticate
 
 CONSUL_URL = environ.get("CONSUL_URL", "http://nginx/consul")
+SUBMISSIONS_BUFFER_SIZE = environ.get("CONSUL_SUBMISSIONS_BUFFER_SIZE", 1000)
 DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
 
 @backoff.on_exception(backoff.expo, requests.exceptions.ConnectionError, max_tries=8, max_value=30)
@@ -50,7 +51,7 @@ def send_dhis2_events(uuid=None, raw_row=None, form_id=None, auth_token=None):
             }
         }
     )
-    if len(events_buffer[form_id]) > 500:
+    if len(events_buffer[form_id]) > SUBMISSIONS_BUFFER_SIZE:
         logging.info("Sending batch of events to consul.")
         __send_events_from_buffer(form_id=form_id, auth_token=auth_token)
 
