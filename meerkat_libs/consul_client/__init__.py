@@ -13,17 +13,6 @@ CONSUL_URL = environ.get("CONSUL_URL", "http://nginx/consul")
 SUBMISSIONS_BUFFER_SIZE = environ.get("CONSUL_SUBMISSIONS_BUFFER_SIZE", 1000)
 DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
 
-@backoff.on_exception(backoff.expo, requests.exceptions.ConnectionError, max_tries=8, max_value=30)
-def initialize_dhis2():
-    if not DHIS2_EXPORT_ENABLED:
-        return
-    logging.info("Initializing consul publisher")
-    headers = _auth_headers()
-    # requests.post(CONSUL_URL + '/dhis2/export/locationTree', headers=_auth_headers())
-    # requests.post(CONSUL_URL + '/dhis2/export/formFields', headers=_auth_headers())
-    logging.info("DONE: Initializing consul publisher")
-
-
 events_buffer = collections.defaultdict(list)
 
 
