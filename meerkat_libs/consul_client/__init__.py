@@ -62,8 +62,11 @@ def __send_events_from_buffer(form_id=None, auth_token=None):
         {"formId": form_id,
          "Messages": events_buffer[form_id]}
     )
-    requests.post(CONSUL_URL + "/dhis2/export/submissions", headers=_auth_headers(auth_token), json=json_payload)
-    events_buffer[form_id] = []
+    try:
+        requests.post(CONSUL_URL + "/dhis2/export/submissions", headers=_auth_headers(auth_token), json=json_payload)
+        events_buffer[form_id] = []
+    except requests.exceptions.ChunkedEncodingError:
+        logging.error("Failed to send chunk of events. Count %i", len(events_buffer[form_id]))
 
 
 def _auth_headers(token):
