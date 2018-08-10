@@ -10,7 +10,7 @@ import requests
 from meerkat_libs import authenticate
 
 CONSUL_URL = environ.get("CONSUL_URL", "http://nginx/consul")
-SUBMISSIONS_BUFFER_SIZE = environ.get("CONSUL_SUBMISSIONS_BUFFER_SIZE", 1000)
+SUBMISSIONS_BUFFER_SIZE = int(environ.get("CONSUL_SUBMISSIONS_BUFFER_SIZE", "1000"))
 DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
 
 events_buffer = collections.defaultdict(list)
