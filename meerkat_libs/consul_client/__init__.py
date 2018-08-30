@@ -16,8 +16,8 @@ DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
 events_buffer = collections.defaultdict(list)
 
 
-def send_dhis2_events(uuid=None, raw_row=None, form_id=None, auth_token=None):
-    if not DHIS2_EXPORT_ENABLED:
+def send_dhis2_events(uuid=None, raw_row=None, form_id=None, auth_token=None, force=False):
+    if not force and not DHIS2_EXPORT_ENABLED:
         return
     if not auth_token:
         logging.error("No authentication token provided.")
