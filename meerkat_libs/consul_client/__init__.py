@@ -10,7 +10,7 @@ import requests
 from meerkat_libs import authenticate
 
 CONSUL_URL = environ.get("CONSUL_URL", "http://nginx/consul")
-SUBMISSIONS_BUFFER_SIZE = int(environ.get("CONSUL_SUBMISSIONS_BUFFER_SIZE", "1000"))
+SUBMISSIONS_BUFFER_SIZE = int(environ.get("CONSUL_SUBMISSIONS_BUFFER_SIZE", "1"))
 DHIS2_EXPORT_ENABLED = environ.get("DHIS2_EXPORT_ENABLED", False)
 
 events_buffer = collections.defaultdict(list)
@@ -41,7 +41,7 @@ def send_dhis2_events(uuid=None, raw_row=None, form_id=None, auth_token=None, fo
         }
     )
     if len(events_buffer[form_id]) > SUBMISSIONS_BUFFER_SIZE:
-        logging.info("Sending batch of events to consul.")
+        logging.info("Sending batch of events to consul. Size: %s", len(events_buffer[form_id]))
         __send_events_from_buffer(form_id=form_id, auth_token=auth_token)
 
 
