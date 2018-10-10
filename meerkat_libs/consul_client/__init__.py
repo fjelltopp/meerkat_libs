@@ -69,5 +69,25 @@ def __send_events_from_buffer(form_id=None, auth_token=None):
         logging.error("Failed to send chunk of events. Form: %s Count %i", form_id, len(events_buffer[form_id]))
 
 
+def backoff_hdlr(details):
+    logging.info("Backing off {wait:0.1f} seconds afters {tries} tries "
+          "calling function {target} with args {args} and kwargs "
+          "{kwargs}".format(**details))
+
+
+@backoff.on_exception(backoff.expo, requests.exceptions.ConnectionError, max_tries=2, max_value=4,
+                      on_backoff=backoff_hdlr)
+@backoff.on_predicate(backoff.expo,
+                      lambda x: False,
+                      max_tries=10,
+                      max_value=60,
+                      on_backoff=backoff_hdlr)
+def wait_for_consul_start():
+    logging.info("Waiting for consul to initialize.")
+    result = 'meerkat_consul' in requests.get(CONSUL_URL).text
+    logging.info("Got %s", result)
+    return result
+
+
 def _auth_headers(token):
     return {'authorization': f"Bearer {token}"}
