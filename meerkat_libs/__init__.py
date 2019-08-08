@@ -3,6 +3,7 @@ import requests
 import json
 import os
 import jwt
+import gettext
 from meerkat_libs.auth_client import auth
 
 # Configs from environment variables
@@ -115,3 +116,17 @@ def hermes(url, method, data={}, config=None):
     except Exception as e:
         logging.error('Failed to convert Hermes response to json.')
         logging.error(e)
+
+def get_translator(translation_dir, language):
+    if language != "en" and translation_dir:
+        try:
+            t = gettext.translation('messages', translation_dir, languages=["en", "fr"])
+        except (FileNotFoundError, OSError):
+            logging.warning("Translations not found", exc_info=True)
+            t = gettext.NullTranslations()
+    else:
+        t = gettext.NullTranslations()
+
+    if language != "en":
+        os.environ["LANGUAGE"] = language
+    return t
