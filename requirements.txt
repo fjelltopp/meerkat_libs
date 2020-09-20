@@ -7,3 +7,4 @@ cryptography==2.6.1
 backoff==1.10.0
 psycopg2-binary==2.8.6
 Babel==2.8.0
+uWSGI==2.0.19.1
